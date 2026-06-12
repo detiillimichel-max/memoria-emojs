@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>🧠 Jogo da Memória – Emojis Divertidos</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1e3c2c, #0f2a1f);
+      font-family: 'Segoe UI', 'Comic Neue', system-ui, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .game-container {
+      max-width: 700px;
+      width: 100%;
+      background: #ffe3b5;
+      border-radius: 60px;
+      padding: 20px;
+      box-shadow: 0 20px 30px rgba(0,0,0,0.3);
+      border: 4px solid #ffbc6e;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      background: #c98f4b;
+      padding: 12px 24px;
+      border-radius: 100px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .card-badge {
+      background: #2f2b20;
+      color: #ffeaac;
+      padding: 6px 16px;
+      border-radius: 40px;
+      font-weight: bold;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .memory-card {
+      aspect-ratio: 1 / 1;
+      background: #ffefcf;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      cursor: pointer;
+      transition: all 0.12s linear;
+      border: 3px solid #ffb451;
+      box-shadow: 0 8px 0 #9b5a2a;
+      transform: scale(1);
+    }
+
+    .memory-card.flipped {
+      background: #fff5e6;
+      border-color: #6bffb8;
+      box-shadow: 0 4px 0 #2c7840;
+      transform: scale(0.98);
+    }
+
+    .memory-card.matched {
+      visibility: hidden;
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: visibility 0.2s, opacity 0.2s, transform 0.2s;
+    }
+
+    .memory-card:active {
+      transform: scale(0.96);
+      box-shadow: 0 2px 0 #9b5a2a;
+    }
+
+    .reset-btn {
+      background: #ffb451;
+      border: none;
+      font-size: 1.2rem;
+      font-weight: bold;
+      padding: 10px 24px;
+      border-radius: 50px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 8px;
+      transition: 0.05s linear;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .reset-btn:active {
+      transform: translateY(2px);
+    }
+
+    .message-area {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 1rem;
+      background: #ffefcf;
+      padding: 8px;
+      border-radius: 60px;
+      font-weight: bold;
+    }
+
+    @media (max-width: 500px) {
+      .grid { gap: 10px; }
+      .memory-card { font-size: 36px; }
+      .card-badge { font-size: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="game-container">
+  <div class="header">
+    <div class="card-badge">🎴 <span id="movesCount">0</span> movimentos</div>
+    <div class="card-badge">⭐ <span id="pairsMatched">0</span> / 8 pares</div>
+    <div class="card-badge">⏱️ <span id="timerDisplay">00:00</span></div>
+  </div>
+
+  <div class="grid" id="memoryGrid"></div>
+
+  <button class="reset-btn" id="resetGameBtn">🔄 NOVO JOGO</button>
+  <div class="message-area" id="gameMessage">🔍 Encontre os pares de emojis!</div>
+</div>
+
+<script>
+  // Lista de 8 pares (16 cartas)
+  const EMOJIS = [
+    '🐶', '🐱', '🐭', '🐹',  // 4 pares
+    '🐰', '🦊', '🐻', '🐼',  // mais 4
+    '🐨', '🐯', '🦁', '🐮',  // 4
+    '🐷', '🐸', '🐵', '🐔'   // 4 = total 16
+  ].slice(0, 16); // garantia de 16 emojis diferentes (8 pares)
+
+  // Vamos pegar os primeiros 8 pares (16 cartas)
+  const PAIRS_COUNT = 8;
+  const cardValues = EMOJIS.slice(0, PAIRS_COUNT); // 8 emojis únicos
+
+  let cards = [];           // array de objetos { emoji, matched, flipped, id }
+  let moveCount = 0;
+  let matchedPairs = 0;
+  let lockBoard = false;
+  let firstCard = null, secondCard = null;
+  let timerSeconds = 0;
+  let timerInterval = null;
+  let gameFinished = false;
+
+  // DOM elements
+  const gridEl = document.getElementById('memoryGrid');
+  const movesSpan = document.getElementById('movesCount');
+  const pairsSpan = document.getElementById('pairsMatched');
+  const timerSpan = document.getElementById('timerDisplay');
+  const messageDiv = document.getElementById('gameMessage');
+  const resetBtn = document.getElementById('resetGameBtn');
+
+  // Helper: formata tempo mm:ss
+  function formatTime(sec) {
+    const mins = Math.floor(sec / 60);
+    const remainSec = sec % 60;
+    return `${mins.toString().padStart(2, '0')}:${remainSec.toString().padStart(2, '0')}`;
+  }
+
+  function updateUI() {
+    movesSpan.textContent = moveCount;
+    pairsSpan.textContent = `${matchedPairs} / ${PAIRS_COUNT}`;
+    timerSpan.textContent = formatTime(timerSeconds);
+  }
+
+  // Para o timer
+  function stopTimer() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  }
+
+  function startTimer() {
+    if (timerInterval) stopTimer();
+    timerInterval = setInterval(() => {
+      if (!gameFinished && !lockBoard) {
+        timerSeconds++;
+        updateUI();
+      }
+    }, 1000);
+  }
+
+  // Reinicia o jogo completamente
+  function initGame() {
+    stopTimer();
+    gameFinished = false;
+    lockBoard = false;
+    moveCount = 0;
+    matchedPairs = 0;
+    timerSeconds = 0;
+    firstCard = null;
+    secondCard = null;
+    updateUI();
+    messageDiv.textContent = '🔍 Encontre os pares de emojis!';
+
+    // Criar deck de cartas: cada par duplicado
+    let deck = [];
+    for (let i = 0; i < PAIRS_COUNT; i++) {
+      deck.push({ emoji: cardValues[i], matched: false, flipped: false, id: i * 2 });
+      deck.push({ emoji: cardValues[i], matched: false, flipped: false, id: i * 2 + 1 });
+    }
+    // Embaralhar (Fisher-Yates)
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    cards = deck;
+
+    renderGrid();
+    startTimer();
+  }
+
+  function renderGrid() {
+    gridEl.innerHTML = '';
+    cards.forEach((card, idx) => {
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'memory-card';
+      if (card.flipped || card.matched) cardDiv.classList.add('flipped');
+      if (card.matched) cardDiv.classList.add('matched');
+      cardDiv.textContent = (card.flipped || card.matched) ? card.emoji : '❓';
+      cardDiv.dataset.index = idx;
+      cardDiv.addEventListener('click', () => onCardClick(idx));
+      gridEl.appendChild(cardDiv);
+    });
+  }
+
+  function checkGameComplete() {
+    if (matchedPairs === PAIRS_COUNT && !gameFinished) {
+      gameFinished = true;
+      stopTimer();
+      messageDiv.innerHTML = `🎉 PARABÉNS! VOCÊ VENCEU! 🎉<br>Movimentos: ${moveCount} | Tempo: ${formatTime(timerSeconds)}`;
+    }
+  }
+
+  function resetAfterMismatch() {
+    lockBoard = true;
+    setTimeout(() => {
+      // fecha as duas cartas não combinadas
+      firstCard.flipped = false;
+      secondCard.flipped = false;
+      firstCard = null;
+      secondCard = null;
+      renderGrid();
+      lockBoard = false;
+    }, 700);
+  }
+
+  function onCardClick(index) {
+    if (lockBoard || gameFinished) return;
+    const clickedCard = cards[index];
+    // não permite clicar em carta já virada ou já emparelhada
+    if (clickedCard.flipped || clickedCard.matched) return;
+
+    // se já tem duas cartas aguardando, não processa novo clique
+    if (firstCard && secondCard) return;
+
+    // vira a carta
+    clickedCard.flipped = true;
+    renderGrid();
+
+    // Se é a primeira carta aberta
+    if (!firstCard) {
+      firstCard = clickedCard;
+      return;
+    }
+
+    // Se é a segunda carta
+    secondCard = clickedCard;
+    moveCount++;
+    updateUI();
+
+    // Comparar os emojis
+    if (firstCard.emoji === secondCard.emoji) {
+      // Match
+      firstCard.matched = true;
+      secondCard.matched = true;
+      firstCard.flipped = false; // matched sobrescreve flipped
+      secondCard.flipped = false;
+      matchedPairs++;
+      updateUI();
+
+      // Limpar referências
+      firstCard = null;
+      secondCard = null;
+
+      renderGrid();
+      checkGameComplete();
+    } else {
+      // Erro: aguarda e desvira
+      resetAfterMismatch();
+    }
+  }
+
+  resetBtn.addEventListener('click', () => {
+    initGame();
+  });
+
+  // Iniciar jogo
+  initGame();
+</script>
+</body>
+</html>
