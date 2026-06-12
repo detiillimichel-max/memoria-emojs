@@ -6,7 +6,7 @@ Vire as cartas, encontre os pares iguais e teste sua capacidade de concentraçã
 
 ![Versão](https://img.shields.io/badge/HTML5-CSS3-orange?style=flat-square)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6-yellow?style=flat-square)
-![Licença MIT](https://img.shields.io/badge/License-MIT-lightgrey)
+
 
 ---
 
