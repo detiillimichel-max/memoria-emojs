@@ -40,9 +40,11 @@ Nenhuma instalação ou servidor necessário.
 
 ```bash
 # Clone o repositório (se estiver no GitHub)
-git clone https://github.com/seu-usuario/jogo-memoria-emojis.git
+git clone https://github.com/seu-usuario/jogo-memoria-emojis.gitt
 cd jogo-memoria-emojis
 # Abra o arquivo index.html
+_____________________________//____________________________________________
+detiillimichel@gmail.com
 © 2026 Michel Detilli.
 Todos os direitos reservados. 
 É permitido jogar online. É proibida a cópia, distribuição ou uso comercial do código sem autorização.
